@@ -1,4 +1,4 @@
-package githubauth
+package herokugoauth
 
 import (
 	"crypto/rand"
