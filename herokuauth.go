@@ -3,21 +3,28 @@ package herokugoauth
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/kr/session"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/github"
+	"github.com/technoweenie/grohl"
 )
 
-const callbackPath = "/_githubauth"
+const callbackPath = "/auth/heroku/callback"
+
+var Endpoint = oauth2.Endpoint{
+		AuthURL: "https://id.heroku.com/oauth/authorize",
+		TokenURL: "https://id.heroku.com/oauth/token",
+}
 
 type Session struct {
 	// Client is an HTTP client obtained from oauth2.Config.Client.
 	// It adds necessary OAuth2 credentials to outgoing requests to
-	// perform GitHub API calls.
+	// perform Heroku API calls.
 	*http.Client
 }
 
@@ -34,24 +41,24 @@ func GetSession(ctx context.Context) (*Session, bool) {
 
 // A ContextHandler can be used as the HTTP handler
 // in a Handler value in order to obtain information
-// about the logged-in GitHub user through the provided
+// about the logged-in Heroku user through the provided
 // Context. See GetSession.
 type ContextHandler interface {
 	ServeHTTPContext(context.Context, http.ResponseWriter, *http.Request)
 }
 
 // Handler is an HTTP handler that requires
-// users to log in with GitHub OAuth and requires
+// users to log in with Heroku OAuth and requires
 // them to be members of the given org.
 type Handler struct {
-	// RequireOrg is a GitHub organization that
+	// RequireOrg is a Heroku organization that
 	// users will be required to be in.
 	// If unset, any user will be permitted.
-	RequireOrg string
+	RequireDomain string
 
 	// Used to initialize corresponding fields of a session Config.
 	// See github.com/kr/session.
-	// If Name is empty, "githubauth" is used.
+	// If Name is empty, "herokugoauth" is used.
 	Name   string
 	Path   string
 	Domain string
@@ -105,15 +112,17 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 
 	redirectURL := "https://" + r.Host + callbackPath
+	grohl.Log(grohl.Data{"at": "loginOK", "secret": h.ClientSecret})
+
 	conf := &oauth2.Config{
 		ClientID:     h.ClientID,
 		ClientSecret: h.ClientSecret,
 		RedirectURL:  redirectURL,
 		Scopes:       h.Scopes,
-		Endpoint:     github.Endpoint,
+		Endpoint:     Endpoint,
 	}
 	if conf.Scopes == nil {
-		conf.Scopes = []string{"user:email", "read:org"}
+		conf.Scopes = []string{"identity"}
 	}
 	if user.OAuthToken != nil {
 		session.Set(w, user, h.sessionConfig()) // refresh the cookie
@@ -125,23 +134,52 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 	if r.URL.Path == callbackPath {
 		if r.FormValue("state") != user.State {
 			h.deleteCookie(w)
+			grohl.Log(grohl.Data{"at": "loginOK", "what": "Mismatched state"})
 			http.Error(w, "access forbidden", 401)
 			return ctx, false
 		}
 		tok, err := conf.Exchange(ctx, r.FormValue("code"))
 		if err != nil {
 			h.deleteCookie(w)
+			grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid credentials", "err": err})
 			http.Error(w, "access forbidden", 401)
 			return ctx, false
 		}
 		client := conf.Client(ctx, tok)
-		if h.RequireOrg != "" {
-			resp, err := client.Head("https://api.github.com/user/memberships/orgs/" + h.RequireOrg)
+		if h.RequireDomain != "" {
+			resp, err := client.Get("https://api.heroku.com/user")
 			if err != nil || resp.StatusCode != 200 {
+				grohl.Log(grohl.Data{"at": "loginOK", "what": "Couldn't reach Heroku", "statuscode": resp.StatusCode, "err": err})
 				h.deleteCookie(w)
 				http.Error(w, "access forbidden", 401)
 				return ctx, false
 			}
+
+			defer resp.Body.Close()
+			decoder := json.NewDecoder(resp.Body)
+			decoded := make(map[string]interface{})
+			if err = decoder.Decode(decoded); err == nil {
+				grohl.Log(grohl.Data{"at": "loginOK", "what": "Failed to decode json", "err": err})
+				h.deleteCookie(w)
+				http.Error(w, "access forbidden", 401)
+				return ctx, false
+			}
+			email, ok := decoded["email"].(string)
+			if !ok {
+				grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email type", "email": decoded["email"]})
+				h.deleteCookie(w)
+				http.Error(w, "access forbidden", 401)
+				return ctx, false
+			}
+
+			user := strings.Split(email, "@")
+			if len(user) < 2 || user[1] != h.RequireDomain {
+				grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email", "email": decoded["email"]})
+				h.deleteCookie(w)
+				http.Error(w, "access forbidden", 401)
+				return ctx, false
+			}
+
 		}
 
 		session.Set(w, sess{OAuthToken: tok}, h.sessionConfig())
@@ -167,7 +205,7 @@ func (h *Handler) sessionConfig() *session.Config {
 		Keys:   h.Keys,
 	}
 	if c.Name == "" {
-		c.Name = "githubauth"
+		c.Name = "herokugoauth"
 	}
 	return c
 }
