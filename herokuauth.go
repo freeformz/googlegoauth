@@ -145,41 +145,12 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 			http.Error(w, "access forbidden", 401)
 			return ctx, false
 		}
+
 		client := conf.Client(ctx, tok)
-		if h.RequireDomain != "" {
-			resp, err := client.Get("https://api.heroku.com/user")
-			if err != nil || resp.StatusCode != 200 {
-				grohl.Log(grohl.Data{"at": "loginOK", "what": "Couldn't reach Heroku", "statuscode": resp.StatusCode, "err": err})
-				h.deleteCookie(w)
-				http.Error(w, "access forbidden", 401)
-				return ctx, false
-			}
-
-			defer resp.Body.Close()
-			decoder := json.NewDecoder(resp.Body)
-			decoded := make(map[string]interface{})
-			if err = decoder.Decode(decoded); err == nil {
-				grohl.Log(grohl.Data{"at": "loginOK", "what": "Failed to decode json", "err": err})
-				h.deleteCookie(w)
-				http.Error(w, "access forbidden", 401)
-				return ctx, false
-			}
-			email, ok := decoded["email"].(string)
-			if !ok {
-				grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email type", "email": decoded["email"]})
-				h.deleteCookie(w)
-				http.Error(w, "access forbidden", 401)
-				return ctx, false
-			}
-
-			user := strings.Split(email, "@")
-			if len(user) < 2 || user[1] != h.RequireDomain {
-				grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email", "email": decoded["email"]})
-				h.deleteCookie(w)
-				http.Error(w, "access forbidden", 401)
-				return ctx, false
-			}
-
+		if h.RequireDomain != "" && !domainAllowed(client, h.RequireDomain) {
+			h.deleteCookie(w)
+			http.Error(w, "access forbidden", 401)
+			return ctx, false
 		}
 
 		session.Set(w, sess{OAuthToken: tok}, h.sessionConfig())
@@ -194,6 +165,36 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 	session.Set(w, sess{NextURL: u.String(), State: state}, h.sessionConfig())
 	http.Redirect(w, r, conf.AuthCodeURL(state), http.StatusTemporaryRedirect)
 	return ctx, false
+}
+
+type account struct {
+	Name string `json:"name"`
+	Email string `json:"email"`
+}
+
+func domainAllowed(client *http.Client, domain string) bool {
+	resp, err := client.Get("https://api.heroku.com/account")
+	if err != nil || resp.StatusCode != 200 {
+		grohl.Log(grohl.Data{"at": "loginOK", "what": "Couldn't reach Heroku", "statuscode": resp.StatusCode, "err": err})
+		return false
+	}
+
+	defer resp.Body.Close()
+
+	var decoded account;
+	decoder := json.NewDecoder(resp.Body)
+	if err = decoder.Decode(&decoded); err != nil {
+		grohl.Log(grohl.Data{"at": "loginOK", "what": "Failed to decode json", "err": err})
+		return false
+	}
+
+	user := strings.Split(decoded.Email, "@")
+	if len(user) < 2 || user[1] != domain {
+		grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email", "email": decoded.Email})
+		return false
+	}
+
+	return true
 }
 
 func (h *Handler) sessionConfig() *session.Config {
