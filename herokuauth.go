@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -58,12 +59,13 @@ type Handler struct {
 
 	// Used to initialize corresponding fields of a session Config.
 	// See github.com/kr/session.
+	// Key should be a 64-character hex string
 	// If Name is empty, "herokugoauth" is used.
 	Name   string
 	Path   string
 	Domain string
 	MaxAge time.Duration
-	Keys   []*[32]byte
+	Key    string
 
 	// Used to initialize corresponding fields of oauth2.Config.
 	// Scopes can be nil, in which case user:email and read:org
@@ -196,13 +198,30 @@ func domainAllowed(client *http.Client, domain string) bool {
 	return true
 }
 
+func keys(s string) []*[32]byte {
+	// e.g. faba0c08be7474a785b272c4f4154c998c0943b51e662637be11b1a0ecda43b3
+	key, err := hex.DecodeString(os.Getenv("KEY"))
+	if err != nil {
+		grohl.Log(grohl.Data{"at": "keys", "what": "Invalid Key code", "err": err.Error()})
+		os.Exit(1)
+	}
+	if len(key) != 32 {
+		grohl.Log(grohl.Data{"at": "keys", "what": "Invalid Key length", "wanted": "32", "got": len(key)})
+		os.Exit(1)
+	}
+
+	var key_array [32]byte
+	copy(key_array[:], key)
+	return []*[32]byte{&key_array}
+}
+
 func (h *Handler) sessionConfig() *session.Config {
 	c := &session.Config{
 		Name:   h.Name,
 		Path:   h.Path,
 		Domain: h.Domain,
 		MaxAge: h.MaxAge,
-		Keys:   h.Keys,
+		Keys:   keys(h.Key),
 	}
 	if c.Name == "" {
 		c.Name = "herokugoauth"
