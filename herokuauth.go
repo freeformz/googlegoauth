@@ -9,16 +9,16 @@ import (
 	"time"
 
 	"github.com/kr/session"
+	"github.com/technoweenie/grohl"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
-	"github.com/technoweenie/grohl"
 )
 
 const callbackPath = "/auth/heroku/callback"
 
 var Endpoint = oauth2.Endpoint{
-		AuthURL: "https://id.heroku.com/oauth/authorize",
-		TokenURL: "https://id.heroku.com/oauth/token",
+	AuthURL:  "https://id.heroku.com/oauth/authorize",
+	TokenURL: "https://id.heroku.com/oauth/token",
 }
 
 type Session struct {
@@ -112,7 +112,6 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 	}
 
 	redirectURL := "https://" + r.Host + callbackPath
-	grohl.Log(grohl.Data{"at": "loginOK", "secret": h.ClientSecret})
 
 	conf := &oauth2.Config{
 		ClientID:     h.ClientID,
@@ -168,7 +167,7 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 }
 
 type account struct {
-	Name string `json:"name"`
+	Name  string `json:"name"`
 	Email string `json:"email"`
 }
 
@@ -181,7 +180,7 @@ func domainAllowed(client *http.Client, domain string) bool {
 
 	defer resp.Body.Close()
 
-	var decoded account;
+	var decoded account
 	decoder := json.NewDecoder(resp.Body)
 	if err = decoder.Decode(&decoded); err != nil {
 		grohl.Log(grohl.Data{"at": "loginOK", "what": "Failed to decode json", "err": err})
