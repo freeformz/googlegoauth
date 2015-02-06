@@ -1,4 +1,4 @@
-package herokugoauth
+package googlegoauth
 
 import (
 	"crypto/rand"
@@ -15,11 +15,11 @@ import (
 	"golang.org/x/oauth2"
 )
 
-const callbackPath = "/auth/heroku/callback"
+const callbackPath = "/oauth2callback"
 
 var Endpoint = oauth2.Endpoint{
-	AuthURL:  "https://id.heroku.com/oauth/authorize",
-	TokenURL: "https://id.heroku.com/oauth/token",
+	AuthURL:  "https://accounts.google.com/o/oauth2/auth",
+	TokenURL: "https://accounts.google.com/o/oauth2/token",
 }
 
 type Session struct {
@@ -52,7 +52,7 @@ type ContextHandler interface {
 // users to log in with Heroku OAuth and requires
 // them to be members of the given org.
 type Handler struct {
-	// RequireOrg is a Heroku organization that
+	// RequireDomain is a domain
 	// users will be required to be in.
 	// If unset, any user will be permitted.
 	RequireDomain string
@@ -123,7 +123,7 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 		Endpoint:     Endpoint,
 	}
 	if conf.Scopes == nil {
-		conf.Scopes = []string{"identity"}
+		conf.Scopes = []string{"https://www.googleapis.com/auth/userinfo.email", "https://www.googleapis.com/auth/userinfo.profile"}
 	}
 	if user.OAuthToken != nil {
 		session.Set(w, user, h.sessionConfig()) // refresh the cookie
@@ -168,30 +168,34 @@ func (h *Handler) loginOk(ctx context.Context, w http.ResponseWriter, r *http.Re
 	return ctx, false
 }
 
-type account struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+// GoogleProfile stores information from the users google+ profile.
+type googleProfile struct {
+	ID          string `json:"id"`
+	DisplayName string `json:"name"`
+	FamilyName  string `json:"family_name"`
+	GivenName   string `json:"given_name"`
+	Email       string `json:"email"`
 }
 
 func domainAllowed(client *http.Client, domain string) bool {
-	resp, err := client.Get("https://api.heroku.com/account")
+	resp, err := client.Get("https://www.googleapis.com/oauth2/v1/userinfo")
 	if err != nil || resp.StatusCode != 200 {
-		grohl.Log(grohl.Data{"at": "loginOK", "what": "Couldn't reach Heroku", "statuscode": resp.StatusCode, "err": err})
+		grohl.Log(grohl.Data{"at": "loginOK", "what": "Couldn't reach Google", "statuscode": resp.StatusCode, "err": err})
 		return false
 	}
 
 	defer resp.Body.Close()
 
-	var decoded account
+	gp := new(googleProfile)
 	decoder := json.NewDecoder(resp.Body)
-	if err = decoder.Decode(&decoded); err != nil {
+	if err = decoder.Decode(gp); err != nil {
 		grohl.Log(grohl.Data{"at": "loginOK", "what": "Failed to decode json", "err": err})
 		return false
 	}
 
-	user := strings.Split(decoded.Email, "@")
+	user := strings.Split(gp.Email, "@")
 	if len(user) < 2 || user[1] != domain {
-		grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email", "email": decoded.Email})
+		grohl.Log(grohl.Data{"at": "loginOK", "what": "Invalid email", "email": gp.Email})
 		return false
 	}
 
@@ -224,7 +228,7 @@ func (h *Handler) sessionConfig() *session.Config {
 		Keys:   keys(h.Key),
 	}
 	if c.Name == "" {
-		c.Name = "herokugoauth"
+		c.Name = "googlegoauth"
 	}
 	return c
 }
