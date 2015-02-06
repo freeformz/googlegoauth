@@ -21,7 +21,7 @@ See <http://godoc.org/github.com/freeformz/googlegoauth> for documentation.
 
 see [cmd/example/main.go](https://github.com/freeformz/googlegoauth/blob/master/cmd/example/main.go)
 
-``shell
+```shell
 $ heroku create -b https://github.com/heroku/heroku-buildpack-go.git
 $ heroku config:set KEY=$(openssl rand -hex 32) CLIENT_ID=^^ CLIENT_SECRET=^^ REQUIRE_DOMAIN=$your_domain
 $ git push heroku master
