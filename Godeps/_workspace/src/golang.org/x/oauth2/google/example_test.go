@@ -13,9 +13,9 @@ import (
 	"net/http"
 	"testing"
 
-	"golang.org/x/oauth2"
-	"golang.org/x/oauth2/google"
-	"golang.org/x/oauth2/jwt"
+	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2"
+	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2/google"
+	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2/jwt"
 	"google.golang.org/appengine"
 	"google.golang.org/appengine/urlfetch"
 )
