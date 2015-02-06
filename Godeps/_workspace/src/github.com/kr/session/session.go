@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/crypto/nacl/secretbox"
+	"golang.org/x/crypto/nacl/secretbox"
 )
 
 const (

@@ -18,9 +18,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2"
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2/internal"
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2/jws"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/internal"
+	"golang.org/x/oauth2/jws"
 )
 
 var (

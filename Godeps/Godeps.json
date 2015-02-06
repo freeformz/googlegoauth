@@ -6,6 +6,10 @@
 	],
 	"Deps": [
 		{
+			"ImportPath": "github.com/kr/secureheader",
+			"Rev": "4e7145f3d23109d940aefff43bc4283ca4ffc2ef"
+		},
+		{
 			"ImportPath": "github.com/kr/session",
 			"Rev": "baa866e82c31195297c540d1ce6c823511868821"
 		},

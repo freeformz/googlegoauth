@@ -11,7 +11,7 @@ import (
 
 	"appengine"
 
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/oauth2"
+	"golang.org/x/oauth2"
 )
 
 // AppEngineTokenSource returns a token source that fetches tokens

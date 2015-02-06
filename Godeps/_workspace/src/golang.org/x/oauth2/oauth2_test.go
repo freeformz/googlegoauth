@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/golang.org/x/net/context"
+	"golang.org/x/net/context"
 )
 
 type mockTransport struct {
