@@ -5,7 +5,7 @@ import (
 	"os"
 
 	"github.com/freeformz/googlegoauth"
-	"github.com/freeformz/googlegoauth/Godeps/_workspace/src/github.com/kr/secureheader"
+	"github.com/kr/secureheader"
 )
 
 func main() {

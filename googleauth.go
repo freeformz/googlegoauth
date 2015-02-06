@@ -13,14 +13,12 @@ import (
 	"github.com/technoweenie/grohl"
 	"golang.org/x/net/context"
 	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/google"
 )
 
 const callbackPath = "/oauth2callback"
 
-var Endpoint = oauth2.Endpoint{
-	AuthURL:  "https://accounts.google.com/o/oauth2/auth",
-	TokenURL: "https://accounts.google.com/o/oauth2/token",
-}
+var Endpoint = google.Endpoint
 
 type Session struct {
 	// Client is an HTTP client obtained from oauth2.Config.Client.
